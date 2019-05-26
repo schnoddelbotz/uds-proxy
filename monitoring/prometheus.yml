@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+    - targets:
+        # prometheus should scrape itself, enables one more fancy dashboard for fun
+        - 'localhost:9090'
+        # on Mac, scrape the non-dockerized, externally running uds-proxy instance
+        - 'host.docker.internal:18080'
+        # ... and scrape the dockerized one
+        - 'udsproxy:28080'

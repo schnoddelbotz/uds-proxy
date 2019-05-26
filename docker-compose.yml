@@ -1,0 +1,46 @@
+version: '3.0'
+
+services:
+
+  grafana:
+    image: grafana/grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    ports:
+      - 3000:3000
+    logging:
+      driver: none
+    depends_on:
+      - prometheus
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+
+  prometheus:
+    image: prom/prometheus
+    logging:
+      driver: none
+    ports:
+      - 9090:9090
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  udsproxy:
+    image: schnoddelbotz/uds-proxy
+    build:
+      context: .
+      dockerfile: uds-proxy.Dockerfile
+    ports:
+      - 28080:28080
+    volumes:
+      - ./udsproxy_docker_test:/tmp
+
+  testserver:
+    environment:
+      - TEST_SERVER_PORT=44555
+    build:
+      context: .
+      dockerfile: proxy_test_server/test_server.Dockerfile
+    ports:
+      - 25778:44555

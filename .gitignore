@@ -1,0 +1,6 @@
+/uds-proxy
+/test_server
+coverage*
+.idea/
+uds-proxy.iml
+uds-proxy.pid
