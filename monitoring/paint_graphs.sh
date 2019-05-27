@@ -25,9 +25,10 @@ echo
 echo "Firing some requests through uds-proxy socket towards test server in 15s...!"
 echo "Watch Grafana / http://localhost:3000/ while waiting for completion."
 echo
+paintCurl "code/201"
 sleep 15
 
-paintCurl "code/301" &
+paintCurl "code/418" &
 paintCurl "code/404" &
 paintCurl "code/201" &
 
@@ -41,16 +42,17 @@ for t in $(seq 0 500 5000); do
   paintCurl "slow/200/$t" &
 done
 
-paintCurl "code/301"
+paintCurl "code/418"
 sleep 5
-paintCurl "code/301"
-sleep 5
-paintCurl "code/302"
+
+for t in $(seq 0 50); do
+  paintCurl "slow/200/50"
+done
 
 sleep 10
 
 # default timeout is 5000, so trigger some 504s as well
-for t in $(seq 0 100 5100); do
+for t in $(seq 0 100 2600); do
   paintCurl "slow/200/$t" &
   paintCurl "slow/200/$t" &
   paintCurl "slow/404/$t" &

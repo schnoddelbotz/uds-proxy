@@ -45,7 +45,7 @@ func (p *ProxyInstance) setupMetrics() {
 
 	p.metrics.RequestsSize = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "response_size_bytes",
+			Name:    "udsproxy_response_size_bytes",
 			Help:    "A histogram of response sizes for requests.",
 			Buckets: []float64{500, 1000, 2500, 5000},
 		},
