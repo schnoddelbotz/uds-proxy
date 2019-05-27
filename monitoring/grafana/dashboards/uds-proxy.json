@@ -33,12 +33,12 @@
       "id": 6,
       "legend": {
         "avg": false,
-        "current": false,
+        "current": true,
         "max": false,
         "min": false,
         "show": true,
         "total": false,
-        "values": false
+        "values": true
       },
       "lines": true,
       "linewidth": 1,
@@ -217,14 +217,14 @@
       "highlightCards": true,
       "id": 4,
       "legend": {
-        "show": false
+        "show": true
       },
       "links": [],
       "options": {},
       "reverseYBuckets": false,
       "targets": [
         {
-          "expr": "sum(increase(udsproxy_request_duration_seconds_bucket[15s])) by (le) ",
+          "expr": "sum(increase(udsproxy_request_duration_seconds_bucket[30s])) by (le) ",
           "format": "heatmap",
           "hide": false,
           "instant": false,
@@ -236,7 +236,7 @@
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Request Duration",
+      "title": "Request Count / Duration",
       "tooltip": {
         "show": true,
         "showHistogram": true
@@ -269,7 +269,7 @@
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-10m",
     "to": "now"
   },
   "timepicker": {
