@@ -21,7 +21,7 @@ func Test_Create(t *testing.T) {
 	e.Shutdown(nil)
 }
 
-func Test_HttpClientUsesEnvArgs(t *testing.T) {
+func Test_HttpClientUsesCliArgs(t *testing.T) {
 	testTimeout := 500
 	e := proxy.NewProxyInstance(proxy.CliArgs{SocketPath: testSocketFilename, ClientTimeout: testTimeout, MaxIdleConns: 11})
 

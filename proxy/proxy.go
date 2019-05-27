@@ -63,7 +63,7 @@ func NewProxyInstance(args CliArgs) *ProxyInstance {
 	if args.PrometheusPort != "" {
 		proxyInstance.setupMetrics()
 	}
-	proxyInstance.HttpClient = newHTTPClient(&proxyInstance.Options)
+	proxyInstance.HttpClient = newHTTPClient(&proxyInstance.Options, proxyInstance.metrics.enabled)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -110,9 +110,10 @@ func (p *ProxyInstance) startSocketServerAcceptLoop() {
 		server.Handler = promhttp.InstrumentHandlerInFlight(p.metrics.RequestsInflight,
 			promhttp.InstrumentHandlerCounter(p.metrics.RequestsCounter,
 				promhttp.InstrumentHandlerDuration(p.metrics.RequestsDuration,
-					func() http.HandlerFunc {
-						return p.handleProxyRequest
-					}())))
+					promhttp.InstrumentHandlerResponseSize(p.metrics.RequestsSize,
+						func() http.HandlerFunc {
+							return p.handleProxyRequest
+						}()))))
 	}
 
 	unixListener, err := net.Listen("unix", p.Options.SocketPath)
@@ -156,17 +157,21 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 	}
 }
 
-func newHTTPClient(opt *CliArgs) (client *http.Client) {
+func newHTTPClient(opt *CliArgs, metricsEnabled bool) (client *http.Client) {
+	transport := http.Transport{
+		MaxConnsPerHost:       opt.MaxConnsPerHost,
+		MaxIdleConns:          opt.MaxIdleConns,
+		MaxIdleConnsPerHost:   opt.MaxIdleConnsPerHost,
+		IdleConnTimeout:       time.Duration(opt.IdleConnTimeout) * time.Millisecond,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 5 * time.Second,
+	}
 	client = &http.Client{
-		Timeout: time.Duration(opt.ClientTimeout) * time.Millisecond,
-		Transport: &http.Transport{
-			MaxConnsPerHost:       opt.MaxConnsPerHost,
-			MaxIdleConns:          opt.MaxIdleConns,
-			MaxIdleConnsPerHost:   opt.MaxIdleConnsPerHost,
-			IdleConnTimeout:       time.Duration(opt.IdleConnTimeout) * time.Millisecond,
-			TLSHandshakeTimeout:   5 * time.Second,
-			ExpectContinueTimeout: 5 * time.Second,
-		},
+		Timeout:   time.Duration(opt.ClientTimeout) * time.Millisecond,
+		Transport: &transport,
+	}
+	if metricsEnabled {
+		client.Transport = getTracingTransport(&transport)
 	}
 	return
 }

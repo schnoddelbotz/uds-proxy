@@ -135,7 +135,6 @@ It can be used to e.g. ensure correct behaviour of uds-proxy's
 
 ## todo ...
 
-- fix heatmap
 - fix/drop sudo nobody for dockerized tests
 - fixme: add option [-dont-follow-redirects](https://stackoverflow.com/questions/23297520/how-can-i-make-the-go-http-client-not-follow-redirects-automatically)
 - add a circuit breaker and or exponential backoff?

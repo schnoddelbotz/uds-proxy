@@ -13,6 +13,7 @@ type AppMetrics struct {
 	RequestsCounter  *prometheus.CounterVec
 	RequestsInflight prometheus.Gauge
 	RequestsDuration *prometheus.HistogramVec
+	RequestsSize     *prometheus.HistogramVec
 }
 
 func (p *ProxyInstance) setupMetrics() {
@@ -27,7 +28,7 @@ func (p *ProxyInstance) setupMetrics() {
 	rqDurationHistogramOpts := prometheus.HistogramOpts{
 		Name:        "udsproxy_request_duration_seconds",
 		Help:        "A histogram of latencies for requests.",
-		Buckets:     []float64{.1, .2, .4, .6, .8, 1, 1.2, 1.5, 1.8, 2, 2.5, 5},
+		Buckets:     []float64{.1, .3, .7, 1, 1.5, 2.5},
 		ConstLabels: prometheus.Labels{"handler": "proxyHandler"},
 	}
 	p.metrics.RequestsDuration = prometheus.NewHistogramVec(
@@ -42,12 +43,59 @@ func (p *ProxyInstance) setupMetrics() {
 		Help:      "Number of requests being actively processed",
 	})
 
+	p.metrics.RequestsSize = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "response_size_bytes",
+			Help:    "A histogram of response sizes for requests.",
+			Buckets: []float64{500, 1000, 2500, 5000},
+		},
+		[]string{},
+	)
+
 	prometheus.MustRegister(
 		p.metrics.RequestsDuration,
 		p.metrics.RequestsInflight,
 		p.metrics.RequestsCounter,
+		p.metrics.RequestsSize,
 	)
 	p.metrics.enabled = true
+}
+
+func getTracingTransport(transport *http.Transport) http.RoundTripper {
+	// copy-pasta from
+	// https://github.com/prometheus/client_golang/blob/master/prometheus/promhttp/instrument_client_test.go
+	dnsLatencyVec := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "udsproxy_dns_duration_seconds",
+			Help:    "Trace dns latency histogram.",
+			Buckets: []float64{.005, .01, .025, .05, .1, .5, 1},
+		},
+		[]string{"event"},
+	)
+	tlsLatencyVec := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "udsproxy_tls_duration_seconds",
+			Help:    "Trace tls latency histogram.",
+			Buckets: []float64{.02, .05, .07, .1, .2, .4},
+		},
+		[]string{"event"},
+	)
+	trace := &promhttp.InstrumentTrace{
+		DNSStart: func(t float64) {
+			dnsLatencyVec.WithLabelValues("dns_start").Observe(t)
+		},
+		DNSDone: func(t float64) {
+			dnsLatencyVec.WithLabelValues("dns_done").Observe(t)
+		},
+		TLSHandshakeStart: func(t float64) {
+			tlsLatencyVec.WithLabelValues("tls_handshake_start").Observe(t)
+		},
+		TLSHandshakeDone: func(t float64) {
+			tlsLatencyVec.WithLabelValues("tls_handshake_done").Observe(t)
+		},
+	}
+	prometheus.MustRegister(tlsLatencyVec, dnsLatencyVec)
+	return promhttp.InstrumentRoundTripperTrace(trace, transport)
 }
 
 func (p *ProxyInstance) startPrometheusMetricsServer() {
