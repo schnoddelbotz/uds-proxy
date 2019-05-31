@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
@@ -141,7 +142,12 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 
 	backendResponse, err := p.HttpClient.Do(backendRequest)
 	if err != nil {
-		http.Error(clientResponseWriter, err.Error(), http.StatusGatewayTimeout)
+		if err.(*url.Error).Timeout() {
+			http.Error(clientResponseWriter, err.Error(), http.StatusGatewayTimeout)
+		} else {
+			http.Error(clientResponseWriter, err.Error(), http.StatusBadGateway)
+		}
+		return
 	} else {
 		for k, v := range backendResponse.Header {
 			clientResponseWriter.Header().Set(k, v[0])

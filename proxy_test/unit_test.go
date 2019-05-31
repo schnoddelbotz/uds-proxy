@@ -39,3 +39,9 @@ func Test_EnvArgumentRemoteHTTPSArrivesInOptions(t *testing.T) {
 func Test_AppVersionDefined(t *testing.T) {
 	assert.NotEqual(t, proxy.AppVersion, "0.0.0-dev")
 }
+
+func Test_PanicsIfDirectoryProvidedAsFilenameForSocket(t *testing.T) {
+	e := proxy.NewProxyInstance(proxy.CliArgs{SocketPath: "/tmp"})
+
+	assert.Panics(t, e.Run, "-socket must be a filename, panics if  undeleteable")
+}
