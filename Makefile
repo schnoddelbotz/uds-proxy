@@ -18,7 +18,7 @@ USE_DOCKER := $(shell test $(IS_MAC) || echo _docker)
 build: $(BINARY)
 
 $(BINARY): cmd/uds-proxy/main.go proxy/*.go
-	env go build -ldflags='-w -s $(LDFLAGS)' ./cmd/uds-proxy
+	go build -ldflags='-w -s $(LDFLAGS)' ./cmd/uds-proxy
 
 test_server: cmd/test_server/main.go proxy_test_server/server.go
 	go build ./cmd/test_server
@@ -33,7 +33,7 @@ release: test realclean
 
 run_proxy: $(BINARY)
 	-./$(BINARY) -socket $(TEST_SOCKET) -pid-file $(TEST_PIDFILE) \
-		-prometheus-port :$(TEST_PROMETHEUS_PORT) -no-log-timestamps $(EXTRA_ARGS)
+		-prometheus-port :$(TEST_PROMETHEUS_PORT) $(EXTRA_ARGS)
 
 run_proxy_docker:
 	@echo "run_proxy_docker: Wait for docker-composed uds-proxy to come up; or use 'make docker_run'"

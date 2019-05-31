@@ -39,6 +39,7 @@ type CliArgs struct {
 	SocketWriteTimeout  int
 	PrintVersion        bool
 	NoLogTimeStamps     bool
+	NoAccessLog         bool
 	RemoteHTTPS         bool
 }
 
@@ -101,19 +102,18 @@ func (p *ProxyInstance) startSocketServerAcceptLoop() {
 	server := http.Server{
 		ReadTimeout:  time.Duration(p.Options.SocketReadTimeout) * time.Millisecond,
 		WriteTimeout: time.Duration(p.Options.SocketWriteTimeout) * time.Millisecond,
-		Handler: func() http.HandlerFunc {
-			return p.handleProxyRequest
-		}(),
-	}
+		Handler:      http.HandlerFunc(p.handleProxyRequest)}
 
 	if p.metrics.enabled {
 		server.Handler = promhttp.InstrumentHandlerInFlight(p.metrics.RequestsInflight,
 			promhttp.InstrumentHandlerCounter(p.metrics.RequestsCounter,
 				promhttp.InstrumentHandlerDuration(p.metrics.RequestsDuration,
 					promhttp.InstrumentHandlerResponseSize(p.metrics.RequestsSize,
-						func() http.HandlerFunc {
-							return p.handleProxyRequest
-						}()))))
+						http.HandlerFunc(p.handleProxyRequest)))))
+	}
+
+	if !p.Options.NoAccessLog {
+		server.Handler = accessLogHandler(server.Handler)
 	}
 
 	unixListener, err := net.Listen("unix", p.Options.SocketPath)
@@ -124,18 +124,16 @@ func (p *ProxyInstance) startSocketServerAcceptLoop() {
 }
 
 func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWriter, clientRequest *http.Request) {
-	requestLogFormat := "%03d %d %s %s '%s'"
-	httpsS := ""
+	scheme := "http"
 	if p.Options.RemoteHTTPS {
-		httpsS = "s"
+		scheme = "https"
 
 	}
-	targetURL := fmt.Sprintf("http%s://%s%s", httpsS, clientRequest.Host, clientRequest.URL)
+	targetURL := fmt.Sprintf("%s://%s%s", scheme, clientRequest.Host, clientRequest.URL)
 
 	backendRequest, err := http.NewRequest(clientRequest.Method, targetURL, clientRequest.Body)
 	if err != nil {
-		log.Printf(requestLogFormat, 0, 0, clientRequest.Method, targetURL, err)
-		http.Error(clientResponseWriter, "500 Internal Server Error", http.StatusInternalServerError)
+		http.Error(clientResponseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	backendRequest.Header = clientRequest.Header
@@ -143,16 +141,14 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 
 	backendResponse, err := p.HttpClient.Do(backendRequest)
 	if err != nil {
-		log.Printf(requestLogFormat, 0, 0, clientRequest.Method, targetURL, err)
-		http.Error(clientResponseWriter, "504 Gateway Timeout", http.StatusGatewayTimeout)
+		http.Error(clientResponseWriter, err.Error(), http.StatusGatewayTimeout)
 	} else {
 		for k, v := range backendResponse.Header {
 			clientResponseWriter.Header().Set(k, v[0])
 		}
 		clientResponseWriter.Header().Set("X-Response-Via", "uds-proxy")
 		clientResponseWriter.WriteHeader(backendResponse.StatusCode)
-		bytesWritten, _ := io.Copy(clientResponseWriter, backendResponse.Body)
-		log.Printf(requestLogFormat, backendResponse.StatusCode, bytesWritten, clientRequest.Method, targetURL, "")
+		io.Copy(clientResponseWriter, backendResponse.Body)
 		backendResponse.Body.Close()
 	}
 }
@@ -171,7 +167,7 @@ func newHTTPClient(opt *CliArgs, metricsEnabled bool) (client *http.Client) {
 		Transport: &transport,
 	}
 	if metricsEnabled {
-		client.Transport = getTracingTransport(&transport)
+		client.Transport = getTracingRoundTripper(&transport)
 	}
 	return
 }

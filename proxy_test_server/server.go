@@ -71,6 +71,10 @@ func RunUpstreamFakeServer(port string, fork bool) *http.Server {
 		}()
 	})
 
+	// todo: return get args as json
+	// todo: echoBody / echoHeaders
+	// todo? route to dynamically set up fake response
+
 	if fork {
 		go func() {
 			if err := srv.ListenAndServe(); err != http.ErrServerClosed {

@@ -47,6 +47,8 @@ Usage of ./uds-proxy:
       maximum number of idle HTTP(S) connections (default 100)
   -max-idle-conns-per-host int
       maximum number of idle conns per backend (default 25)
+  -no-access-log
+    	disable proxy access logging
   -no-log-timestamps
       disable timestamps in log messages
   -pid-file string
@@ -131,19 +133,17 @@ curl_exec($ch);
 
 Mac's (i.e. BSD's) netcat allows to talk to unix domain sockets.
 It can be used to e.g. ensure correct behaviour of uds-proxy's
-`-socket-(read|write)-timeout` options. Simply use `nc -U /path/to/uds-proxy.sock`.
+`-socket-(read|write)-timeout` options. Try `nc -U /path/to/uds-proxy.sock`.
 
 ## todo ...
 
 - fix/drop sudo nobody for dockerized tests
 - fixme: add option [-dont-follow-redirects](https://stackoverflow.com/questions/23297520/how-can-i-make-the-go-http-client-not-follow-redirects-automatically)
-- add a circuit breaker and or exponential backoff?
-- cleanup: wrap handleProxyRequest into logging handler
+- for http/s client:
+  - wrap in circuit breaker?
+  - wrap in retry /w exponential backoff? consider api consumer constraints (i.e. timeout - worth it?)
 - travis-ci + github release push
-- level-based stdout/err logging https://awesome-go.com/#logging
 - example systemd unit
-- log request sizes?
-- use/fix 'make test' in Dockerfile
 - sock umask / cli opt
 - support magic uds request headers...?
   - X-udsproxy-timeout: 250ms
@@ -161,15 +161,20 @@ It can be used to e.g. ensure correct behaviour of uds-proxy's
 
 ## alternatives
 
+Obviously, uds-proxy is a kludge. Simply use connection pooling if available!
+
+- for Python and HTTP, simply reuse [requests library's session objects](https://2.python-requests.org/en/master/user/advanced/#session-objects) and you're set
 - for Python and Redis, use a [redis.py connection pool](https://github.com/andymccurdy/redis-py#connection-pools)
-- for Python and HTTP, requests library will just do it
-- for Redis and PHP, [phpredis](https://github.com/phpredis/phpredis) supports experimental persistent connections
+- for Redis and PHP, [phpredis](https://github.com/phpredis/phpredis) supports connection pooling since v4.2.1
 - a potentially more sophisticated solution can be found in
   [this TCP vs UDS speed comparison stackoverflow thread](https://stackoverflow.com/questions/14973942/performance-tcp-loopback-connection-vs-unix-domain-socket):
   [Speedus](http://speedus.torusware.com/) intercepts relevant system calls, which avoids
   need for any code changes. However, if I understood correctly, Speedus only helps if
-  services actually sit on the same host system.
+  services actually sit on the same host system (?).
 
+You can also use NGINX [to create a UDS HTTP/S pooling forward proxy](https://serverfault.com/questions/899109/universal-persistent-connection-pool-proxy-with-nginx) like uds-proxy.
+It seems that neither [Apache](https://bz.apache.org/bugzilla/show_bug.cgi?id=55898)
+nor Squid (?) are able to do that.
 
 ## license
 

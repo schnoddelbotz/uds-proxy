@@ -61,7 +61,7 @@ func (p *ProxyInstance) setupMetrics() {
 	p.metrics.enabled = true
 }
 
-func getTracingTransport(transport *http.Transport) http.RoundTripper {
+func getTracingRoundTripper(transport *http.Transport) http.RoundTripper {
 	// copy-pasta from
 	// https://github.com/prometheus/client_golang/blob/master/prometheus/promhttp/instrument_client_test.go
 	dnsLatencyVec := prometheus.NewHistogramVec(
