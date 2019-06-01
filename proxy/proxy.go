@@ -1,12 +1,12 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/schnoddelbotz/uds-proxy/retryablehttp"
 )
 
 var (
@@ -22,9 +23,10 @@ var (
 )
 
 type ProxyInstance struct {
-	Options    CliArgs
-	HttpClient *http.Client
-	metrics    AppMetrics
+	Options             CliArgs
+	HttpClient          *http.Client
+	RetryableHttpClient *retryablehttp.Client
+	metrics             AppMetrics
 }
 
 type CliArgs struct {
@@ -32,6 +34,7 @@ type CliArgs struct {
 	PidFile             string
 	PrometheusPort      string
 	ClientTimeout       int
+	ClientMaxRetries    int
 	MaxConnsPerHost     int
 	MaxIdleConns        int
 	MaxIdleConnsPerHost int
@@ -66,6 +69,9 @@ func NewProxyInstance(args CliArgs) *ProxyInstance {
 		proxyInstance.setupMetrics()
 	}
 	proxyInstance.HttpClient = newHTTPClient(&proxyInstance.Options, proxyInstance.metrics.enabled)
+	//if args.ClientMaxRetries > 0 {
+	proxyInstance.RetryableHttpClient = retryablehttp.NewClientWithClient(proxyInstance.HttpClient)
+	//}
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -132,23 +138,8 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 	}
 	targetURL := fmt.Sprintf("%s://%s%s", scheme, clientRequest.Host, clientRequest.URL)
 
-	backendRequest, err := http.NewRequest(clientRequest.Method, targetURL, clientRequest.Body)
-	if err != nil {
-		http.Error(clientResponseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	backendRequest.Header = clientRequest.Header
-	backendRequest.Header.Set("X-Request-Via", "uds-proxy")
-
-	backendResponse, err := p.HttpClient.Do(backendRequest)
-	if err != nil {
-		if err.(*url.Error).Timeout() {
-			http.Error(clientResponseWriter, err.Error(), http.StatusGatewayTimeout)
-		} else {
-			http.Error(clientResponseWriter, err.Error(), http.StatusBadGateway)
-		}
-		return
-	} else {
+	backendResponse, backendError := p.backendFetch(targetURL, clientResponseWriter, clientRequest)
+	if backendError == nil {
 		for k, v := range backendResponse.Header {
 			clientResponseWriter.Header().Set(k, v[0])
 		}
@@ -156,6 +147,28 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 		clientResponseWriter.WriteHeader(backendResponse.StatusCode)
 		io.Copy(clientResponseWriter, backendResponse.Body)
 		backendResponse.Body.Close()
+	}
+}
+
+func (p *ProxyInstance) backendFetch(targetURL string, clientResponseWriter http.ResponseWriter, clientRequest *http.Request) (*http.Response, error) {
+	if p.Options.ClientMaxRetries > 0 {
+		backendRequest, internalError := retryablehttp.NewRequest(clientRequest.Method, targetURL, clientRequest.Body)
+		if internalError != nil {
+			http.Error(clientResponseWriter, internalError.Error(), http.StatusInternalServerError)
+			return nil, errors.New("huh")
+		}
+		backendRequest.Header = clientRequest.Header
+		backendRequest.Header.Set("X-Request-Via", "uds-proxy")
+		return p.RetryableHttpClient.Do(backendRequest)
+	} else {
+		backendRequest, internalError := http.NewRequest(clientRequest.Method, targetURL, clientRequest.Body)
+		if internalError != nil {
+			http.Error(clientResponseWriter, internalError.Error(), http.StatusInternalServerError)
+			return nil, errors.New("huh")
+		}
+		backendRequest.Header = clientRequest.Header
+		backendRequest.Header.Set("X-Request-Via", "uds-proxy")
+		return p.HttpClient.Do(backendRequest)
 	}
 }
 

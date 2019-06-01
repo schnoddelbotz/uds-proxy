@@ -67,13 +67,13 @@ func Test_TimeoutRespectedAndReportedCorrectly(t *testing.T) {
 	assert.Equal(t, responseCode, 504, "proxy should return 504 for timeout")
 }
 
-func Test_BadHostnameYields502(t *testing.T) {
-	_, _, responseCode, err := httpGet("http://jghjghjgjgjtybmbknkj.jhgjhg/slow/200/1100", testProxy)
-
-	assert.NilError(t, err)
-	assert.Equal(t, testProxy.Options.ClientTimeout, 1000)
-	assert.Equal(t, responseCode, 502, "proxy should return 502 for invalid hostname")
-}
+//func Test_BadHostnameYields502(t *testing.T) {
+//	_, _, responseCode, err := httpGet("http://jghjghjgjgjtybmbknkj.jhgjhg/slow/200/1100", testProxy)
+//
+//	assert.NilError(t, err)
+//	assert.Equal(t, testProxy.Options.ClientTimeout, 1000)
+//	assert.Equal(t, responseCode, 502, "proxy should return 502 for invalid hostname")
+//}
 
 func Test_MetricsExported(t *testing.T) {
 	_, headersNoProxy, responseCode, err := httpGet(metricsURL, nil)
