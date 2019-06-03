@@ -21,6 +21,7 @@ func main() {
 	flag.BoolVar(&args.RemoteHTTPS, "remote-https", false, "remote uses https://")
 
 	flag.IntVar(&args.MaxConnsPerHost, "max-conns-per-host", 20, "maximum number of connections per backend host")
+	flag.IntVar(&args.ClientMaxRetries, "max-retries", 0, "maximum retries with exponential backoff")
 	flag.IntVar(&args.MaxIdleConns, "max-idle-conns", 100, "maximum number of idle HTTP(S) connections")
 	flag.IntVar(&args.MaxIdleConnsPerHost, "max-idle-conns-per-host", 15, "maximum number of idle conns per backend")
 	flag.IntVar(&args.ClientTimeout, "client-timeout", 5000, "http client connection timeout [ms] for proxy requests")

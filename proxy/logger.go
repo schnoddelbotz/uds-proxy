@@ -14,7 +14,7 @@ func accessLogHandler(h http.Handler) http.Handler {
 		o := &responseObserver{ResponseWriter: w}
 		h.ServeHTTP(o, r)
 		log.Printf("%q %d %d %q %q",
-			fmt.Sprintf("%s %s %s", r.Method, r.URL, r.Proto),
+			fmt.Sprintf("%s %s%s %s", r.Method, r.Host, r.URL, r.Proto),
 			o.status,
 			o.written,
 			r.Referer(),

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"fmt"
+	"github.com/PuerkitoBio/rehttp"
 	"io"
 	"log"
 	"net"
@@ -32,6 +33,7 @@ type CliArgs struct {
 	PidFile             string
 	PrometheusPort      string
 	ClientTimeout       int
+	ClientMaxRetries    int
 	MaxConnsPerHost     int
 	MaxIdleConns        int
 	MaxIdleConnsPerHost int
@@ -160,7 +162,7 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 }
 
 func newHTTPClient(opt *CliArgs, metricsEnabled bool) (client *http.Client) {
-	transport := http.Transport{
+	transport := &http.Transport{
 		MaxConnsPerHost:       opt.MaxConnsPerHost,
 		MaxIdleConns:          opt.MaxIdleConns,
 		MaxIdleConnsPerHost:   opt.MaxIdleConnsPerHost,
@@ -170,10 +172,16 @@ func newHTTPClient(opt *CliArgs, metricsEnabled bool) (client *http.Client) {
 	}
 	client = &http.Client{
 		Timeout:   time.Duration(opt.ClientTimeout) * time.Millisecond,
-		Transport: &transport,
+		Transport: transport,
+	}
+
+	if opt.ClientMaxRetries > 0 {
+		client.Transport = rehttp.NewTransport(transport,
+			rehttp.RetryMaxRetries(opt.ClientMaxRetries),
+			rehttp.ExpJitterDelay(100*time.Millisecond, time.Duration(opt.ClientTimeout)*time.Millisecond))
 	}
 	if metricsEnabled {
-		client.Transport = getTracingRoundTripper(&transport)
+		client.Transport = getTracingRoundTripper(transport)
 	}
 	return
 }
