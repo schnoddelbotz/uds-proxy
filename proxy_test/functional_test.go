@@ -92,7 +92,7 @@ func Test_ProxyPreservesResponseHeaders(t *testing.T) {
 	assert.Equal(t, responseCode, 200)
 	assert.Equal(t, headersNoProxy.Get("X-Response-Via"), "")
 	// run same request through proxy instance
-	args := proxy.CliArgs{
+	args := proxy.Settings{
 		SocketPath:  "uds-proxy-https.sock",
 		RemoteHTTPS: true,
 	}
@@ -145,7 +145,7 @@ func httpGet(url string, proxyInstance *proxy.Instance) (body []byte, header htt
 }
 
 func newTestProxyInstance() *proxy.Instance {
-	args := proxy.CliArgs{
+	args := proxy.Settings{
 		SocketPath:      "uds-proxy-functional_test.sock",
 		PidFile:         "uds-proxy-test.pid",
 		PrometheusPort:  metricsPort,

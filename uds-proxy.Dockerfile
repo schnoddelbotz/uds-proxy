@@ -2,7 +2,8 @@
 FROM golang:1.12.5 as build-env
 WORKDIR /src/github.com/schnoddelbotz/uds-proxy
 COPY . .
-RUN make test clean uds-proxy CGO_ENABLED=0
+RUN go get golang.org/x/lint/golint && \
+    make test clean uds-proxy CGO_ENABLED=0
 
 FROM alpine
 RUN apk add ca-certificates

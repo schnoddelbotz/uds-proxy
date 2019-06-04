@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	var args proxy.CliArgs
+	var args proxy.Settings
 
 	if os.Getuid() == 0 {
 		println("uds-proxy is refusing to run as root user")
