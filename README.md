@@ -1,4 +1,5 @@
-# uds-proxy
+# uds-proxy [![goreportcard](https://goreportcard.com/badge/github.com/schnoddelbotz/uds-proxy)](https://goreportcard.com/report/github.com/schnoddelbotz/uds-proxy) [![GoDoc](https://godoc.org/github.com/PuerkitoBio/rehttp?status.png)](godoc)
+
 uds-proxy provides a UNIX domain socket and forwards traffic to HTTP(S) remotes
 through a customizable connection pool (i.e. using persistent connections).
 

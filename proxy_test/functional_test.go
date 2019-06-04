@@ -37,7 +37,8 @@ func TestMain(m *testing.M) {
 	res := m.Run()
 
 	testProxy.Shutdown(nil)
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	if err := fakeServer.Shutdown(ctx); err != nil {
 		log.Printf("fakeserver shutdown fail:s %s", err)
 	}

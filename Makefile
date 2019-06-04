@@ -10,6 +10,7 @@ TEST_PIDFILE  := uds-proxy.pid
 TEST_PROMETHEUS_PORT := 18080
 TEST_DOCKERIZED_SOCKET_DIR := $(PWD)/udsproxy_docker_test
 TEST_DOCKERIZED_SOCKET := $(TEST_DOCKERIZED_SOCKET_DIR)/uds-proxy-docker.sock
+PROMETHEUS_ARGS := -prometheus-port :$(TEST_PROMETHEUS_PORT)
 
 IS_MAC := $(shell test "Darwin" = "`uname -s`" && echo 1)
 USE_DOCKER := $(shell test $(IS_MAC) || echo _docker)
@@ -32,8 +33,7 @@ release: test realclean
 
 
 run_proxy: $(BINARY)
-	-./$(BINARY) -socket $(TEST_SOCKET) -pid-file $(TEST_PIDFILE) \
-		-prometheus-port :$(TEST_PROMETHEUS_PORT) $(EXTRA_ARGS)
+	-./$(BINARY) -socket $(TEST_SOCKET) -pid-file $(TEST_PIDFILE) $(PROMETHEUS_ARGS) $(EXTRA_ARGS)
 
 run_proxy_docker:
 	@echo "run_proxy_docker: Wait for docker-composed uds-proxy to come up; or use 'make docker_run'"
