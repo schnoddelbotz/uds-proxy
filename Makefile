@@ -49,6 +49,7 @@ run_test_server_docker:
 
 
 test: test_go_unit test_go_functional
+	golint -set_exit_status ./proxy
 
 test_go_unit:
 	go test -ldflags='-w -s $(LDFLAGS)' -tags=unit ./proxy_test

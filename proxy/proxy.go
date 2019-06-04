@@ -22,17 +22,17 @@ import (
 )
 
 // AppVersion is set at compile time via make / ldflags
-var AppVersion = "0.0.0-dev"
+var AppVersion = "0.8.x-dev"
 
 // Instance provides state storage for a single proxy instance.
 type Instance struct {
-	Options    CliArgs
-	HttpClient *http.Client
+	Options    Settings
+	HTTPClient *http.Client
 	metrics    appMetrics
 }
 
-// CliArgs configure a Instance and need to be passed to NewProxyInstance().
-type CliArgs struct {
+// Settings configure a Instance and need to be passed to NewProxyInstance().
+type Settings struct {
 	SocketPath          string
 	PidFile             string
 	PrometheusPort      string
@@ -49,7 +49,8 @@ type CliArgs struct {
 	RemoteHTTPS         bool
 }
 
-func NewProxyInstance(args CliArgs) *Instance {
+// NewProxyInstance validates supplied Settings and returns a ready-to-run proxy instance.
+func NewProxyInstance(args Settings) *Instance {
 	if args.PrintVersion {
 		println("uds-proxy", AppVersion, runtime.Version())
 		os.Exit(0)
@@ -70,7 +71,7 @@ func NewProxyInstance(args CliArgs) *Instance {
 	if args.PrometheusPort != "" {
 		proxyInstance.setupMetrics()
 	}
-	proxyInstance.HttpClient = newHTTPClient(&proxyInstance.Options, proxyInstance.metrics.enabled)
+	proxyInstance.HTTPClient = newHTTPClient(&proxyInstance.Options, proxyInstance.metrics.enabled)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -79,6 +80,7 @@ func NewProxyInstance(args CliArgs) *Instance {
 	return &proxyInstance
 }
 
+// Run starts the proxy's socket server accept loop, which will run until Shutdown() is called.
 func (proxy *Instance) Run() {
 	if proxy.metrics.enabled {
 		go proxy.startPrometheusMetricsServer()
@@ -86,12 +88,13 @@ func (proxy *Instance) Run() {
 	proxy.startSocketServerAcceptLoop()
 }
 
+// Shutdown cleanly terminates a proxy instance (and is invoked by signal handlers or during tests).
 func (proxy *Instance) Shutdown(sig os.Signal) {
 	if sig == nil {
 		sig = os.Interrupt
 	}
 	log.Printf("%v -- cleaning up", sig)
-	proxy.HttpClient.CloseIdleConnections()
+	proxy.HTTPClient.CloseIdleConnections()
 	os.Remove(proxy.Options.SocketPath)
 	os.Remove(proxy.Options.PidFile)
 	log.Print("uds-proxy shut down cleanly. nice. good bye 👋")
@@ -145,7 +148,7 @@ func (proxy *Instance) handleProxyRequest(clientResponseWriter http.ResponseWrit
 	backendRequest.Header = clientRequest.Header
 	backendRequest.Header.Set("X-Request-Via", "uds-proxy")
 
-	backendResponse, err := proxy.HttpClient.Do(backendRequest)
+	backendResponse, err := proxy.HTTPClient.Do(backendRequest)
 	if err != nil {
 		if err.(*url.Error).Timeout() {
 			http.Error(clientResponseWriter, err.Error(), http.StatusGatewayTimeout)
@@ -153,18 +156,18 @@ func (proxy *Instance) handleProxyRequest(clientResponseWriter http.ResponseWrit
 			http.Error(clientResponseWriter, err.Error(), http.StatusBadGateway)
 		}
 		return
-	} else {
-		for k, v := range backendResponse.Header {
-			clientResponseWriter.Header().Set(k, v[0])
-		}
-		clientResponseWriter.Header().Set("X-Response-Via", "uds-proxy")
-		clientResponseWriter.WriteHeader(backendResponse.StatusCode)
-		io.Copy(clientResponseWriter, backendResponse.Body)
-		backendResponse.Body.Close()
 	}
+
+	for k, v := range backendResponse.Header {
+		clientResponseWriter.Header().Set(k, v[0])
+	}
+	clientResponseWriter.Header().Set("X-Response-Via", "uds-proxy")
+	clientResponseWriter.WriteHeader(backendResponse.StatusCode)
+	io.Copy(clientResponseWriter, backendResponse.Body)
+	backendResponse.Body.Close()
 }
 
-func newHTTPClient(opt *CliArgs, metricsEnabled bool) (client *http.Client) {
+func newHTTPClient(opt *Settings, metricsEnabled bool) (client *http.Client) {
 	transport := http.Transport{
 		MaxConnsPerHost:       opt.MaxConnsPerHost,
 		MaxIdleConns:          opt.MaxIdleConns,

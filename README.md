@@ -1,4 +1,4 @@
-# uds-proxy [![goreportcard](https://goreportcard.com/badge/github.com/schnoddelbotz/uds-proxy)](https://goreportcard.com/report/github.com/schnoddelbotz/uds-proxy) [![GoDoc](https://godoc.org/github.com/PuerkitoBio/rehttp?status.png)](godoc)
+# uds-proxy [![goreportcard](https://goreportcard.com/badge/github.com/schnoddelbotz/uds-proxy)](https://goreportcard.com/report/github.com/schnoddelbotz/uds-proxy) [![GoDoc](https://godoc.org/github.com/PuerkitoBio/rehttp?status.png)](https://godoc.org/github.com/schnoddelbotz/uds-proxy/proxy)
 
 uds-proxy provides a UNIX domain socket and forwards traffic to HTTP(S) remotes
 through a customizable connection pool (i.e. using persistent connections).
@@ -172,6 +172,8 @@ Obviously, uds-proxy is a kludge. Simply use connection pooling if available!
   [Speedus](http://speedus.torusware.com/) intercepts relevant system calls, which avoids
   need for any code changes. However, if I understood correctly, Speedus only helps if
   services actually sit on the same host system (?).
+
+Maybe look at [phantom](https://github.com/Flipkart/phantom)?
 
 You can also use NGINX [to create a UDS HTTP/S pooling forward proxy](https://serverfault.com/questions/899109/universal-persistent-connection-pool-proxy-with-nginx) like uds-proxy.
 It seems that neither [Apache](https://bz.apache.org/bugzilla/show_bug.cgi?id=55898)
