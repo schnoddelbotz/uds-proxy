@@ -1,3 +1,8 @@
+/*
+Package proxy implements an HTTP forward proxy that exclusively listens on a UNIX domain socket for
+client requests. It uses a single http.Client to proxy requests, enabling connection
+pooling. Optionally, the proxy can expose metrics via prometheus client library.
+*/
 package proxy
 
 import (
@@ -17,17 +22,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var (
-	// AppVersion is set at compile time via make / ldflags
-	AppVersion = "0.0.0-dev"
-)
+// AppVersion is set at compile time via make / ldflags
+var AppVersion = "0.0.0-dev"
 
-type ProxyInstance struct {
+// Instance provides state storage for a single proxy instance.
+type Instance struct {
 	Options    CliArgs
 	HttpClient *http.Client
-	metrics    AppMetrics
+	metrics    appMetrics
 }
 
+// CliArgs configure a Instance and need to be passed to NewProxyInstance().
 type CliArgs struct {
 	SocketPath          string
 	PidFile             string
@@ -46,7 +51,7 @@ type CliArgs struct {
 	RemoteHTTPS         bool
 }
 
-func NewProxyInstance(args CliArgs) *ProxyInstance {
+func NewProxyInstance(args CliArgs) *Instance {
 	if args.PrintVersion {
 		println("uds-proxy", AppVersion, runtime.Version())
 		os.Exit(0)
@@ -62,7 +67,7 @@ func NewProxyInstance(args CliArgs) *ProxyInstance {
 
 	writePidFile(args.PidFile)
 
-	proxyInstance := ProxyInstance{}
+	proxyInstance := Instance{}
 	proxyInstance.Options = args
 	if args.PrometheusPort != "" {
 		proxyInstance.setupMetrics()
@@ -76,59 +81,59 @@ func NewProxyInstance(args CliArgs) *ProxyInstance {
 	return &proxyInstance
 }
 
-func (p *ProxyInstance) Run() {
-	if p.metrics.enabled {
-		go p.startPrometheusMetricsServer()
+func (proxy *Instance) Run() {
+	if proxy.metrics.enabled {
+		go proxy.startPrometheusMetricsServer()
 	}
-	p.startSocketServerAcceptLoop()
+	proxy.startSocketServerAcceptLoop()
 }
 
-func (p *ProxyInstance) Shutdown(sig os.Signal) {
+func (proxy *Instance) Shutdown(sig os.Signal) {
 	if sig == nil {
 		sig = os.Interrupt
 	}
 	log.Printf("%v -- cleaning up", sig)
-	p.HttpClient.CloseIdleConnections()
-	os.Remove(p.Options.SocketPath)
-	os.Remove(p.Options.PidFile)
+	proxy.HttpClient.CloseIdleConnections()
+	os.Remove(proxy.Options.SocketPath)
+	os.Remove(proxy.Options.PidFile)
 	log.Print("uds-proxy shut down cleanly. nice. good bye 👋")
 }
 
-func (p *ProxyInstance) startSocketServerAcceptLoop() {
-	if _, err := os.Stat(p.Options.SocketPath); err == nil {
-		err := os.Remove(p.Options.SocketPath)
+func (proxy *Instance) startSocketServerAcceptLoop() {
+	if _, err := os.Stat(proxy.Options.SocketPath); err == nil {
+		err := os.Remove(proxy.Options.SocketPath)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	server := http.Server{
-		ReadTimeout:  time.Duration(p.Options.SocketReadTimeout) * time.Millisecond,
-		WriteTimeout: time.Duration(p.Options.SocketWriteTimeout) * time.Millisecond,
-		Handler:      http.HandlerFunc(p.handleProxyRequest)}
+		ReadTimeout:  time.Duration(proxy.Options.SocketReadTimeout) * time.Millisecond,
+		WriteTimeout: time.Duration(proxy.Options.SocketWriteTimeout) * time.Millisecond,
+		Handler:      http.HandlerFunc(proxy.handleProxyRequest)}
 
-	if p.metrics.enabled {
-		server.Handler = promhttp.InstrumentHandlerInFlight(p.metrics.RequestsInflight,
-			promhttp.InstrumentHandlerCounter(p.metrics.RequestsCounter,
-				promhttp.InstrumentHandlerDuration(p.metrics.RequestsDuration,
-					promhttp.InstrumentHandlerResponseSize(p.metrics.RequestsSize,
-						http.HandlerFunc(p.handleProxyRequest)))))
+	if proxy.metrics.enabled {
+		server.Handler = promhttp.InstrumentHandlerInFlight(proxy.metrics.RequestsInflight,
+			promhttp.InstrumentHandlerCounter(proxy.metrics.RequestsCounter,
+				promhttp.InstrumentHandlerDuration(proxy.metrics.RequestsDuration,
+					promhttp.InstrumentHandlerResponseSize(proxy.metrics.RequestsSize,
+						http.HandlerFunc(proxy.handleProxyRequest)))))
 	}
 
-	if !p.Options.NoAccessLog {
+	if !proxy.Options.NoAccessLog {
 		server.Handler = accessLogHandler(server.Handler)
 	}
 
-	unixListener, err := net.Listen("unix", p.Options.SocketPath)
+	unixListener, err := net.Listen("unix", proxy.Options.SocketPath)
 	if err != nil {
 		panic(err)
 	}
 	server.Serve(unixListener)
 }
 
-func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWriter, clientRequest *http.Request) {
+func (proxy *Instance) handleProxyRequest(clientResponseWriter http.ResponseWriter, clientRequest *http.Request) {
 	scheme := "http"
-	if p.Options.RemoteHTTPS {
+	if proxy.Options.RemoteHTTPS {
 		scheme = "https"
 
 	}
@@ -142,7 +147,7 @@ func (p *ProxyInstance) handleProxyRequest(clientResponseWriter http.ResponseWri
 	backendRequest.Header = clientRequest.Header
 	backendRequest.Header.Set("X-Request-Via", "uds-proxy")
 
-	backendResponse, err := p.HttpClient.Do(backendRequest)
+	backendResponse, err := proxy.HttpClient.Do(backendRequest)
 	if err != nil {
 		if err.(*url.Error).Timeout() {
 			http.Error(clientResponseWriter, err.Error(), http.StatusGatewayTimeout)
