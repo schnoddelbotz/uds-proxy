@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func sigHandler(c chan os.Signal, env *ProxyInstance) {
+func sigHandler(c chan os.Signal, env *Instance) {
 	for sig := range c {
 		println()
 		env.Shutdown(sig)

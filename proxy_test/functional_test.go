@@ -18,7 +18,7 @@ import (
 	"github.com/schnoddelbotz/uds-proxy/proxy_test_server"
 )
 
-var testProxy *proxy.ProxyInstance
+var testProxy *proxy.Instance
 
 const (
 	fakeServerPort    = ":25777"
@@ -125,7 +125,7 @@ func Test_ProxyPreservesResponseHeaders(t *testing.T) {
 // TestMetricsReportCorrectNumberOfRequests
 // check behaviour with sticky/slow client ie sock read timeout etc
 
-func httpGet(url string, proxyInstance *proxy.ProxyInstance) (body []byte, header http.Header, responseCode int, err error) {
+func httpGet(url string, proxyInstance *proxy.Instance) (body []byte, header http.Header, responseCode int, err error) {
 	client := http.Client{}
 	if proxyInstance != nil {
 		client.Transport = &http.Transport{
@@ -144,7 +144,7 @@ func httpGet(url string, proxyInstance *proxy.ProxyInstance) (body []byte, heade
 	return
 }
 
-func newTestProxyInstance() *proxy.ProxyInstance {
+func newTestProxyInstance() *proxy.Instance {
 	args := proxy.CliArgs{
 		SocketPath:      "uds-proxy-functional_test.sock",
 		PidFile:         "uds-proxy-test.pid",

@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type AppMetrics struct {
+type appMetrics struct {
 	enabled          bool
 	RequestsCounter  *prometheus.CounterVec
 	RequestsInflight prometheus.Gauge
@@ -16,8 +16,8 @@ type AppMetrics struct {
 	RequestsSize     *prometheus.HistogramVec
 }
 
-func (p *ProxyInstance) setupMetrics() {
-	p.metrics.RequestsCounter = prometheus.NewCounterVec(
+func (proxy *Instance) setupMetrics() {
+	proxy.metrics.RequestsCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "udsproxy_http_requests_total",
 			Help: "How many requests processed, partitioned by status code and HTTP method.",
@@ -31,19 +31,19 @@ func (p *ProxyInstance) setupMetrics() {
 		Buckets:     []float64{.1, .3, .7, 1, 1.5, 2.5},
 		ConstLabels: prometheus.Labels{"handler": "proxyHandler"},
 	}
-	p.metrics.RequestsDuration = prometheus.NewHistogramVec(
+	proxy.metrics.RequestsDuration = prometheus.NewHistogramVec(
 		rqDurationHistogramOpts,
 		[]string{"method"},
 	)
 
-	p.metrics.RequestsInflight = prometheus.NewGauge(prometheus.GaugeOpts{
+	proxy.metrics.RequestsInflight = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "udsproxy",
 		Subsystem: "http",
 		Name:      "inflight",
 		Help:      "Number of requests being actively processed",
 	})
 
-	p.metrics.RequestsSize = prometheus.NewHistogramVec(
+	proxy.metrics.RequestsSize = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "udsproxy_response_size_bytes",
 			Help:    "A histogram of response sizes for requests.",
@@ -53,12 +53,12 @@ func (p *ProxyInstance) setupMetrics() {
 	)
 
 	prometheus.MustRegister(
-		p.metrics.RequestsDuration,
-		p.metrics.RequestsInflight,
-		p.metrics.RequestsCounter,
-		p.metrics.RequestsSize,
+		proxy.metrics.RequestsDuration,
+		proxy.metrics.RequestsInflight,
+		proxy.metrics.RequestsCounter,
+		proxy.metrics.RequestsSize,
 	)
-	p.metrics.enabled = true
+	proxy.metrics.enabled = true
 }
 
 func getTracingRoundTripper(transport *http.Transport) http.RoundTripper {
@@ -98,8 +98,8 @@ func getTracingRoundTripper(transport *http.Transport) http.RoundTripper {
 	return promhttp.InstrumentRoundTripperTrace(trace, transport)
 }
 
-func (p *ProxyInstance) startPrometheusMetricsServer() {
-	log.Printf("Prometheus : http://localhost%s/metrics", p.Options.PrometheusPort)
+func (proxy *Instance) startPrometheusMetricsServer() {
+	log.Printf("Prometheus : http://localhost%s/metrics", proxy.Options.PrometheusPort)
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(p.Options.PrometheusPort, nil))
+	log.Fatal(http.ListenAndServe(proxy.Options.PrometheusPort, nil))
 }
